@@ -26,4 +26,5 @@ _screenshot of the bottom/tail of the **cat vagrantfile** command output_
 <br>
 
 _ifconfig output_
+
 ![My ifconfig output Screenshot](./images/ifconfig-output-screenshot.png "My ifconfig output Screenshot")
