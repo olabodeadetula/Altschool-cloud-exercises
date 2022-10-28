@@ -16,10 +16,10 @@ Ansible playbook
 
 <li>
 
-Output of systemctl status apache2
+The output of systemctl status apache2 after deploying the playbook
 <br>
 
-![systemctl status apache2]()
+![systemctl status apache2](./images/systemctl-status-apache2.png "The output of systemctl status apache2 after deploying the playbook")
 </li>
 
 <li>
