@@ -29,6 +29,8 @@
 
 **Email Sample**
 <br>
+
+![Email sample](./images/email-sample.png)
 </li>
 
 </ol>
