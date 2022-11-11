@@ -1,0 +1,8 @@
+---
+app_user: "olabode"
+mysql_root_password: "adetula"
+http_host: "laravelapp"
+http_conf: "laravelapp.conf"
+disable_default: true
+http_port: "80"
+https_port: "443"

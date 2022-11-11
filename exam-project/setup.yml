@@ -1,0 +1,204 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+  vars_files:
+    - vars/default.yml
+
+  tasks:
+    - name: apt update and upgrade
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+  # INSTALL AND RUN APACHE2
+    - name: Install apache2
+      apt:
+       name: apache2
+       state: latest
+
+    - name: Run apache2
+      service:
+        name: apache2
+        state: started
+
+ # INSTALL PHP AND ITS DEPENDENCIES
+    - name: Get php repository
+      apt_repository:
+        repo: ppa:ondrej/php
+        state: absent
+
+    - name: Update apt cache
+      register: updatesys
+      apt:
+        name: "*"
+        state: latest
+        update_cache: yes
+
+    - name: Install php8.1 and dependencies
+      apt:
+        name:
+          - ca-certificates
+          - software-properties-common
+          - apt-transport-https
+          - php
+          - php-mysql
+          - php-curl
+          - php-xml
+          - php-dev
+          - php-mbstring
+          - php-zip
+          - php-gd
+          - libapache2-mod-php
+        state: latest
+        update_cache: yes
+
+  # MYSQL CONFIGURATION AND SETTINGS
+    - name: Install mySQL
+      apt:
+        name:
+          - mysql-server
+          - mysql-client
+          - python3-pymysql
+          - python3-mysqldb
+        state: present
+        update_cache: yes
+
+    - name: Startup mySQL
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Create mySQL root user
+      mysql_user:
+        name: "{{ app_user }}"
+        password: "{{ mysql_root_password }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        host: "%"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        priv: '*.*:ALL,GRANT'
+        state: present
+      changed_when: false
+
+    - name: Set the root password
+      mysql_user:
+        name: "{{ app_user }}"
+        password: "{{ mysql_root_password }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        priv: '*.*:ALL,GRANT'
+        state: present
+      changed_when: false
+
+    - name: Create mySQL database
+      mysql_db:
+        name: "laraveldb"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+  # UFW Configuration
+    - name: UFW - Allow SSH connections
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: UFW - Enable and deny by default
+      ufw:
+        default: deny
+        state: enabled
+
+    - name: "UFW - Allow HTTP on port {{ http_port }}"
+      ufw:
+        rule: allow
+        port: "{{ http_port }}"
+        proto: tcp
+
+    - name: "UFW - Allow HTTPS on port {{ https_port }}"
+      ufw:
+        rule: allow
+        port: "{{ https_port }}"
+        proto: tcp
+
+    - name: Create virtualhost
+      copy:
+        src: files/apache.conf.j2
+        dest: /etc/apache2/sites-available
+
+  # GETTING AND CHANGING COMPOSER PATH
+    - name: get composer
+      shell: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin/ --filename=composer
+      args:
+        chdir: /usr/src
+        creates: /usr/local/bin/composer
+        warn: false
+
+  # INSTALL GIT AND CLONE LARAVEL APP
+    - name: git install
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Clone laravel app from repository
+      git:
+        repo: https://github.com/f1amy/laravel-realworld-example-app.git
+        dest: /var/www/{{ http_host }}
+        clone: yes
+        force: yes
+
+    - name: Install composer
+      shell:
+        cmd: sudo composer install --no-interaction
+        chdir: /var/www/{{ http_host }}
+      environment:
+        COMPOSER_NO_INTERACTION: "1"
+
+    - name: Set laravelapp folder
+      shell:
+        cmd: cp -r /var/www/{{ http_host }} /var/www/html/
+
+    - name: Change the .env file
+      copy:
+        src: .env
+        dest: /var/www/html/{{ http_host }}
+
+    - name: Change file permission
+      shell:
+        cmd: sudo chown -R www-data:www-data /var/www/html/{{ http_host }}
+
+    - name: Set file permission
+      shell:
+        cmd: sudo chmod -R 775 /var/www/html/{{ http_host }}/storage
+
+    - name: Update php page
+      copy:
+        dest: /var/www/html/{{ http_host }}/routes/web.php
+        content: |
+          <?php
+          Route::get('/', function (){
+              return view('welcome');
+          });
+    - name: Create project
+      args:
+        chdir: /var/www/html/{{ http_host }}
+      shell: composer create-project -y
+
+    - name: Migrate the database
+      shell: php artisan migrate --seed
+      args:
+        chdir: /var/www/html/{{ http_host }}/
+
+  # DISABLE DEFAULT APACHE SITE, ENABLE NEW SITE AND RELOAD APACHE
+    - name: Disable default Apache site
+      shell: a2dissite 000-default.conf
+
+    - name: Enable new site
+      shell: a2ensite {{ http_conf }}
+
+    - name: Reload Apache
+      shell: systemctl reload apache2

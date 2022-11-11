@@ -1,0 +1,20 @@
+<VirtualHost *:{{ http_port }}>
+    ServerAdmin webmaster@localhost
+    ServerName exam.olabodeadetula.me
+    ServerAlias www.exam.olabodeadetula.me
+
+    DocumentRoot /var/www/{{ http_host }}
+    
+    <Directory /var/www/{{ http_host }}>
+          Options  Indexes FollowSymLinks
+          AllowOverride All
+          Require all granted
+    </Directory>
+   
+    <IfModule mod_dir.c>
+        DirectoryIndex index.php index.html index.cgi index.pl  index.xhtml ind>
+    </IfModule>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
